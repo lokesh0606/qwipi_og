@@ -216,6 +216,14 @@ class BaseLLMProvider:
 7. **Safe State Preservation**:
    - `fetchConversations()` checks `streamingTitleConvIdRef.current` to ensure background database syncs never overwrite in-flight titles.
 8. **Cancellation**: If user aborts, call `abortController.abort()`.
+9. **Butter-Smooth Token Scheduling (`requestAnimationFrame`)**:
+   - In [useChatStream.ts](file:///c:/Users/Lokes/OneDrive/Documents/code/qwipi/frontend/src/hooks/useChatStream.ts), tokens are buffered and scheduled via `requestAnimationFrame` to synchronize React state updates with the display refresh rate (60Hz/120Hz), preventing CPU spikes and layout thrashing.
+10. **Zero-Jitter Scroll Pinning**:
+    - In [MessageList.tsx](file:///c:/Users/Lokes/OneDrive/Documents/code/qwipi/frontend/src/components/chat/MessageList.tsx), auto-scrolling during stream updates directly sets `container.scrollTop = container.scrollHeight` rather than calling `scrollIntoView({ behavior: 'smooth' })`. This eliminates jitter from overlapping scroll interpolation loops.
+    - User scroll detection (`handleScroll`) detects when the user scrolls up to read past context and disables downward scroll snapping. A floating "Recent" button allows one-click return to bottom.
+11. **Thinking Indicator Gating & Active Cursor**:
+    - `StreamingIndicator` renders ONLY while waiting for the first token (`!lastMessage.content`). Once text starts streaming, it exits, preventing constant downward layout shifts.
+    - [MessageBubble.tsx](file:///c:/Users/Lokes/OneDrive/Documents/code/qwipi/frontend/src/components/MessageBubble.tsx) is memoized via `React.memo` and displays an active glowing pulsing cursor at the end of the streaming message.
 
 ---
 

@@ -200,23 +200,57 @@ export function useChatStream() {
 
             const reader = response.body.getReader()
             const decoder = new TextDecoder()
-            let assistantMessage: Message = { role: 'assistant', content: '' }
+            let accumulatedContent = ''
+            let rafId: number | null = null
+            let hasPendingUpdate = false
 
-            setMessages(prev => [...prev, assistantMessage])
-
-            while (true) {
-                const { done, value } = await reader.read()
-                if (done) break
-
-                const chunk = decoder.decode(value)
-                assistantMessage.content += chunk
-
+            const flushUpdate = () => {
+                if (!hasPendingUpdate) return
+                hasPendingUpdate = false
                 if (currentConversationIdRef.current === conversationId) {
                     setMessages(prev => {
                         const newMessages = [...prev]
-                        newMessages[newMessages.length - 1] = { ...assistantMessage }
+                        if (newMessages.length > 0 && newMessages[newMessages.length - 1].role === 'assistant') {
+                            newMessages[newMessages.length - 1] = {
+                                ...newMessages[newMessages.length - 1],
+                                content: accumulatedContent
+                            }
+                        } else {
+                            newMessages.push({ role: 'assistant', content: accumulatedContent })
+                        }
                         return newMessages
                     })
+                }
+            }
+
+            const scheduleUpdate = () => {
+                hasPendingUpdate = true
+                if (rafId === null) {
+                    rafId = requestAnimationFrame(() => {
+                        rafId = null
+                        flushUpdate()
+                    })
+                }
+            }
+
+            // Immediately append initial assistant message
+            setMessages(prev => [...prev, { role: 'assistant', content: '' }])
+
+            while (true) {
+                const { done, value } = await reader.read()
+                if (done) {
+                    if (rafId !== null) {
+                        cancelAnimationFrame(rafId)
+                        rafId = null
+                    }
+                    flushUpdate()
+                    break
+                }
+
+                const chunk = decoder.decode(value, { stream: true })
+                if (chunk) {
+                    accumulatedContent += chunk
+                    scheduleUpdate()
                 }
             }
         } catch (error: any) {

@@ -1,11 +1,16 @@
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { User, Copy, Check, AlertTriangle } from 'lucide-react'
-import { useState } from 'react'
+import { useState, memo } from 'react'
 import type { Message } from '../types'
 import aiLogo from '../assets/ai-logo.png'
 
-export default function MessageBubble({ message }: { message: Message }) {
+interface MessageBubbleProps {
+    message: Message
+    isStreaming?: boolean
+}
+
+function MessageBubbleComponent({ message, isStreaming = false }: MessageBubbleProps) {
     const isUser = message.role === 'user'
     const isError = message.isError
     const [copied, setCopied] = useState(false)
@@ -45,7 +50,7 @@ export default function MessageBubble({ message }: { message: Message }) {
                         ? 'bg-red-500/10 border-red-500/20 text-red-300 rounded-tl-none'
                         : 'bg-white/10 dark:bg-white/5 border-black/10 dark:border-white/10 text-gray-800 dark:text-gray-100 rounded-tl-none'
             }`}>
-                {!isUser && !isError && (
+                {!isUser && !isError && message.content && (
                     <button
                         onClick={handleCopy}
                         className="absolute top-2 right-2 p-1.5 rounded-md bg-black/20 hover:bg-black/40 text-white/60 hover:text-white opacity-0 group-hover:opacity-100 transition-all"
@@ -55,7 +60,7 @@ export default function MessageBubble({ message }: { message: Message }) {
                     </button>
                 )}
 
-                <div className={`prose dark:prose-invert prose-sm max-w-none prose-pre:p-0 prose-pre:bg-transparent ${!isUser && 'text-gray-800 dark:text-gray-100'}`}>
+                <div className={`prose dark:prose-invert prose-sm max-w-none break-words leading-relaxed prose-pre:p-0 prose-pre:bg-transparent ${!isUser && 'text-gray-800 dark:text-gray-100'}`}>
                     <ReactMarkdown
                         remarkPlugins={[remarkGfm]}
                         components={{
@@ -94,8 +99,25 @@ export default function MessageBubble({ message }: { message: Message }) {
                     >
                         {message.content}
                     </ReactMarkdown>
+                    {isStreaming && (
+                        <span
+                            className="inline-block w-2 h-4 ml-1 -mb-0.5 bg-blue-500 dark:bg-blue-400 rounded-sm animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.8)] align-middle"
+                            aria-hidden="true"
+                        />
+                    )}
                 </div>
             </div>
         </div>
     )
 }
+
+const MessageBubble = memo(MessageBubbleComponent, (prev, next) => {
+    return (
+        prev.message.content === next.message.content &&
+        prev.message.role === next.message.role &&
+        prev.message.isError === next.message.isError &&
+        prev.isStreaming === next.isStreaming
+    )
+})
+
+export default MessageBubble

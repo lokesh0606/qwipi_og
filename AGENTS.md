@@ -231,10 +231,13 @@ select(Conversation).where(
 select(Conversation).where(Conversation.id == conversation_id)
 ```
 
-### Invariant 2: Raw Text Chunk Streaming Protocol
+### Invariant 2: Raw Text Chunk Streaming & Butter-Smooth UI Rendering Protocol
 The `/chat` endpoint returns a FastAPI `StreamingResponse(generate(), media_type="text/plain")` with header `X-Conversation-Id: <id>`.
 - The generator yields **raw text chunks** as they arrive from the Groq API.
-- The frontend hook [useChatStream.ts](file:///c:/Users/Lokes/OneDrive/Documents/code/qwipi/frontend/src/hooks/useChatStream.ts) decodes incoming chunks using a native `TextDecoder`.
+- The frontend hook [useChatStream.ts](file:///c:/Users/Lokes/OneDrive/Documents/code/qwipi/frontend/src/hooks/useChatStream.ts) decodes incoming chunks using `TextDecoder.decode(value, { stream: true })`.
+- **Display Refresh-Rate Batching**: To prevent UI stutter and frame drops, incoming tokens are buffered and flushed to React state via `requestAnimationFrame` at 60Hz/120Hz display refresh rate.
+- **Zero-Jitter Scroll Pinning**: In [MessageList.tsx](file:///c:/Users/Lokes/OneDrive/Documents/code/qwipi/frontend/src/components/chat/MessageList.tsx), smooth-scroll animations are NEVER executed on micro-token updates. Auto-scrolling uses direct DOM pinning (`container.scrollTop = container.scrollHeight`), eliminating animation abort-and-restart jitter. User scroll up is respected without forceful downward snapping.
+- **MessageBubble Memoization**: [MessageBubble.tsx](file:///c:/Users/Lokes/OneDrive/Documents/code/qwipi/frontend/src/components/MessageBubble.tsx) is wrapped in `React.memo` so historical messages are not re-parsed or re-rendered as new tokens arrive.
 - **DO NOT** wrap tokens in JSON envelopes (e.g., `{"token": "..."}`) unless simultaneously rewriting `useChatStream.ts`.
 - The assistant message is committed to PostgreSQL in the generator's `finally` block to preserve responses even if the client disconnects prematurely.
 
