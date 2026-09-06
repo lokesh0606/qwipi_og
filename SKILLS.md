@@ -21,6 +21,8 @@
    ├─────────────────────────────────────────────────────────────────────────────────┤
    │ [SKILL-09] User & Admin CLI Management                                          │
    │ [SKILL-10] Docker Compose Full-Stack Orchestration                              │
+   │ [SKILL-11] Git & Remote Repository Synchronization                              │
+   │ [SKILL-12] Living Documentation Continuous Synchronization                      │
    └─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -186,27 +188,34 @@ class BaseLLMProvider:
 
 ## [SKILL-05] Frontend Streaming & Chat State Management
 
-### Key File: [frontend/src/hooks/useChatStream.ts](file:///c:/Users/Lokes/OneDrive/Documents/code/qwipi/frontend/src/hooks/useChatStream.ts)
+### Key Files
+- [frontend/src/hooks/useChatStream.ts](file:///c:/Users/Lokes/OneDrive/Documents/code/qwipi/frontend/src/hooks/useChatStream.ts): Core streaming hook
+- [frontend/src/components/Sidebar.tsx](file:///c:/Users/Lokes/OneDrive/Documents/code/qwipi/frontend/src/components/Sidebar.tsx): Sidebar conversation list & streaming indicator
+- [backend/chat.py](file:///c:/Users/Lokes/OneDrive/Documents/code/qwipi/backend/chat.py): `generate_title_stream` LLM title generator
+- [backend/api.py](file:///c:/Users/Lokes/OneDrive/Documents/code/qwipi/backend/api.py): `POST /chat` & `POST /chat/title-stream`
 
-### How Streaming Works
-1. **Trigger**: User enters prompt and hits Submit in `ChatInput.tsx`.
-2. **Optimistic UI**: User message is immediately appended to local state `messages`.
-3. **HTTP Fetch**: A POST request is dispatched to `${API_BASE_URL}/chat` with `Authorization: Bearer <token>`.
-4. **Header Capture**: The response header `X-Conversation-Id` is inspected:
-   - If starting a new chat, the conversation ID is captured and set as active.
-   - Title streaming is simultaneously initiated via `POST /chat/title-stream`.
-5. **SSE / Chunk Decoding**:
-   ```typescript
-   const reader = response.body.getReader();
-   const decoder = new TextDecoder();
-   while (true) {
-       const { value, done } = await reader.read();
-       if (done) break;
-       const chunk = decoder.decode(value, { stream: true });
-       // Update assistant message content in state
-   }
-   ```
-6. **Cancellation**: If user aborts, call `abortController.abort()`.
+### How Streaming & Dynamic Titles Work
+1. **Trigger & Optimistic User Message**:
+   - User types prompt in `ChatInput.tsx` and submits.
+   - Message is optimistically appended to local `messages` state.
+2. **Immediate Optimistic Renaming (New Chats)**:
+   - If starting a new chat (`!currentConversationId`), the sidebar conversation item is created immediately using a truncated slice of the prompt:
+     `optimisticTitle = trimmedPrompt.slice(0, 28) + '...'`
+   - Prevents stagnant "New Chat" labels from ever being visible.
+3. **Dual Parallel Streaming Execution**:
+   - **Stream A (Assistant Response)**: Sent to `POST /chat`. Generates raw markdown tokens via `StreamingResponse(generate(), media_type="text/plain")`.
+   - **Stream B (Title Generation)**: Concurrently sent to `POST /chat/title-stream`.
+4. **Visual Glowing Streaming Indicator**:
+   - `streamingTitleConvId` tracks the conversation actively generating a title.
+   - [Sidebar.tsx](file:///c:/Users/Lokes/OneDrive/Documents/code/qwipi/frontend/src/components/Sidebar.tsx) renders a pulsing blue glowing dot (`animate-ping` + shadow glow) next to the conversation item while `streamingTitleConvId === conv.id`.
+5. **Typewriter Character Streaming**:
+   - Title tokens arrive from Groq; frontend replaces optimistic title with typewriter character delay (`20ms`) for a smooth typing animation.
+6. **Dynamic Multi-Turn Adaptation**:
+   - During the first 2–3 turns of a conversation (`messages.length <= 5`), `streamTitle()` is triggered again on each user turn to refine the title as the conversation evolves.
+   - After turn 3, the title stabilizes permanently.
+7. **Safe State Preservation**:
+   - `fetchConversations()` checks `streamingTitleConvIdRef.current` to ensure background database syncs never overwrite in-flight titles.
+8. **Cancellation**: If user aborts, call `abortController.abort()`.
 
 ---
 
@@ -305,3 +314,48 @@ docker compose down
 # Stop containers and wipe volumes (CLEAN RESET - CAUTION)
 docker compose down -v
 ```
+
+---
+
+## [SKILL-11] Git & Remote Repository Synchronization
+
+### Repository Specifications
+- **Remote Repository URL**: `https://github.com/lokesh0606/qwipi_og.git`
+- **Default Branch**: `main`
+- **Git User Name**: `LOKESH KANKALAPATI`
+- **Git Email**: `lokeshkankalapati06@gmail.com`
+
+### Verification & Sync Runbook
+```bash
+# 1. Verify working directory status (ensure .env and secrets are not untracked/staged)
+git status
+
+# 2. Stage verified source code modifications
+git add .
+
+# 3. Commit with semantic convention
+git commit -m "feat/fix: <description of change>"
+
+# 4. Push cleanly to the main branch
+git push origin main
+```
+
+---
+
+## [SKILL-12] Living Documentation Continuous Synchronization
+
+### When to Use
+Execute this procedure at the conclusion of **EVERY** conversation or session where code changes, architectural modifications, new endpoints, or UI features are introduced.
+
+### Synchronization Checklist
+1. **Audit `AGENTS.md`**:
+   - Did database models or schemas change? -> Update Section 4 Data Contracts.
+   - Did security, permissions, or routes change? -> Update Section 5 Invariants.
+   - Did repository structure change? -> Update Section 2 Topography Map.
+2. **Audit `SKILLS.md`**:
+   - Did you create a new workflow or pattern? -> Add a new SOP runbook `[SKILL-XX]`.
+   - Did existing hook or component behavior change? -> Update the corresponding procedure.
+3. **Audit Workspace Skills (`.agents/skills/`)**:
+   - Cross-check `qwipi-navigation`, `qwipi-verification`, and `qwipi-chat-streaming`.
+4. **Commit & Push**:
+   - Ensure documentation updates are committed together with code changes to keep GitHub repository `qwipi_og` fully synchronized.

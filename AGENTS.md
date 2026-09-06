@@ -246,6 +246,7 @@ The `/chat` endpoint returns a FastAPI `StreamingResponse(generate(), media_type
 
 ### Invariant 4: Administrative Elevation & CLI
 Administrator status (`is_admin=True`) grants access to `/api/v1/admin/*` and the frontend `/admin` dashboard.
+An "Admin Dashboard" navigation button is dynamically rendered in [Sidebar.tsx](file:///c:/Users/Lokes/OneDrive/Documents/code/qwipi/frontend/src/components/Sidebar.tsx) for all users with `user.is_admin === true`.
 Admins can be managed via [backend/cli.py](file:///c:/Users/Lokes/OneDrive/Documents/code/qwipi/backend/cli.py):
 ```bash
 # List all registered users
@@ -260,6 +261,15 @@ python -m backend.cli demote-admin <email>
 # Reset user password
 python -m backend.cli set-password <email> <new_password>
 ```
+
+### Invariant 5: Real-Time Optimistic & Streaming Conversation Titles
+Conversation titles must never remain stagnant as "New Chat" when a user interacts:
+1. **Immediate Optimistic Title**: Upon message submission in a new chat, [useChatStream.ts](file:///c:/Users/Lokes/OneDrive/Documents/code/qwipi/frontend/src/hooks/useChatStream.ts) immediately creates/updates the sidebar conversation item with a truncated slice of the user's prompt (`prompt.slice(0, 28) + '...'`).
+2. **Parallel Title Stream**: Concurrently with the message generation stream (`POST /chat`), the frontend dispatches `POST /chat/title-stream`.
+3. **Visual Streaming Indicator**: While the title is actively streaming, `streamingTitleConvId` is populated, rendering a pulsing blue glowing dot (`animate-ping` + shadow glow) beside the title in [Sidebar.tsx](file:///c:/Users/Lokes/OneDrive/Documents/code/qwipi/frontend/src/components/Sidebar.tsx).
+4. **Dynamic Multi-Turn Adaptation**: For turns 1–3 of a conversation (`messages.length <= 5`), the title stream re-evaluates conversational context (last 6 messages) to adapt and refine the conversation title as the topic evolves, after which the title stabilizes.
+5. **Reasoning Token Headroom**: `GroqProvider.generate_title_stream` allocates `max_tokens=200` to prevent token starvation on reasoning models (e.g., `openai/gpt-oss-120b`).
+6. **Isolated Database Persistence**: `stream_title_endpoint` in [backend/api.py](file:///c:/Users/Lokes/OneDrive/Documents/code/qwipi/backend/api.py) operates inside an independent `AsyncSessionLocal()` scope to safely persist titles without interfering with concurrent conversation message writes.
 
 ---
 
@@ -277,3 +287,20 @@ Before applying changes to this codebase, execute the following pre-flight check
    - Run `python -m py_compile` on modified backend files.
    - Run `npm run lint` or `npm run build` in `frontend/` to confirm type correctness.
    - Run `python backend/verify_servers.py` when live services are being tested.
+
+---
+
+## 7. Continuous Operational Synchronization Protocol (Living Document Mandate)
+
+> [!IMPORTANT]
+> **MANDATORY INVARIANT FOR ALL AI AGENTS & DEVELOPERS**:
+> In **EVERY** conversation or session where changes, enhancements, or bug fixes are introduced to this codebase, you **MUST** update `AGENTS.md` and `SKILLS.md` (and relevant `.agents/skills/` documents) before concluding your task.
+
+### Operational Rules of Engagement:
+1. **Never Allow Documentation Drift**: Any modification to architecture, API contracts, frontend hooks, state management, dependencies, or workflows must be reflected in `AGENTS.md` and `SKILLS.md` in the same turn or final wrap-up.
+2. **Document New Features Immediately**: If a new endpoint, UI behavior, or context is introduced (e.g., streaming title adaptation, admin shortcuts), add its architectural invariant to `AGENTS.md` and standard operating procedure (SOP) to `SKILLS.md`.
+3. **Keep Git Repository Sync Clean**:
+   - Canonical GitHub remote: `https://github.com/lokesh0606/qwipi_og.git`
+   - Active branch: `main`
+   - Author configuration: `LOKESH KANKALAPATI <lokeshkankalapati06@gmail.com>`
+   - Strictly avoid staging secrets (`.env`, database files, or credentials). Always verify `.gitignore` enforcement before committing.
