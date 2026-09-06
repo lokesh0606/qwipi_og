@@ -1,0 +1,16 @@
+openai
+pydantic[email]
+python-dotenv
+fastapi
+uvicorn
+python-multipart
+sqlalchemy
+aiosqlite
+asyncpg
+bcrypt
+python-jose[cryptography]
+slowapi
+alembic
+psycopg2-binary
+redis
+gunicorn
