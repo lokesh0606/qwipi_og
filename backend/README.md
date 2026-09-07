@@ -1,209 +1,119 @@
-# Qiwipi
+# Qwipi Backend API
 
-## Overview
-
-Qiwipi is a simple chat application that utilizes Azure OpenAI to provide streaming responses. This application is designed for seamless interaction and can be easily customized to suit various use cases. Follow the steps below to set up and run the application.
+> Asynchronous FastAPI backend providing multi-tenant authentication, multi-turn LLM streaming via Groq LPU, Redis token revocation/rate-limiting, and PostgreSQL conversational persistence.
 
 ---
 
-## Prerequisites
+## 🏗️ Architecture & Technology Stack
 
-Before proceeding, ensure you have the following:
-
-1. Python 3.7 or higher installed on your system.
-2. An Azure OpenAI account with the necessary credentials.
-3. Required permissions to access Azure services.
-4. A terminal or command-line interface.
+- **Framework**: FastAPI `0.141` + Starlette `1.6` (ASGI)
+- **Runtime**: Python 3.11+
+- **Database**: PostgreSQL 17 via async SQLAlchemy 2.0 (`asyncpg`)
+- **Database Migrations**: Alembic (`psycopg2-binary`)
+- **Cache & Revocation**: Redis 8 (`redis-py` async client)
+- **LLM Inference**: Groq LPU via `AsyncOpenAI` client
+- **Rate Limiting**: `slowapi` backed by Redis storage
+- **Authentication**: `bcrypt` password hashing + HS256 JWT tokens
 
 ---
 
-## Setup Instructions
+## ⚙️ Environment Variables Setup
 
-### 1. Clone the Repository
-
-Clone the Qiwipi repository to your local system:
+Create a `.env` file in the repository root or `backend/` directory from `.env.example`:
 
 ```bash
-$ git clone <repository-url>
-$ cd Qiwipi
+# Core LLM Engine
+GROQ_API_KEY=gsk_your_groq_api_key_here
+
+# PostgreSQL Database (Asyncpg)
+DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/qwipi_db
+
+# Redis In-Memory Store
+REDIS_URL=redis://localhost:6379/0
+
+# JWT Authentication
+SECRET_KEY=your-super-secret-hex-encoded-key-change-in-production
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=60
+
+# Initial Superuser Auto-Promotion
+FIRST_SUPERUSER_EMAIL=admin@example.com
+
+# CORS Allowed Origins
+ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000
 ```
 
-### 2. Configure Azure Credentials
+---
 
-Locate the `.env_example` file in the root directory of the project and use it to create your `.env` file with the necessary Azure credentials.
+## 🚀 Running the Backend
 
-1. Rename `.env_example` to `.env`:
+### Method 1: Local Virtual Environment
+```bash
+# 1. Activate virtual environment
+# Windows:
+venv\Scripts\activate
+# Linux/macOS:
+source venv/bin/activate
 
-   ```bash
-   $ mv .env_example .env
-   ```
+# 2. Install dependencies
+pip install -r backend/requirements.txt
 
-2. Open the `.env` file in your preferred text editor and fill in the required Azure credentials:
-   
-   ```plaintext
-   AZURE_OPENAI_API_KEY= Enter Azure OpenAI API Key
-   AZURE_OPENAI_DEPLOYMENT= Enter Model Name as Deployed on Azure
-   AZURE_OPENAI_VERSION= Enter the Azure OpenAI API Version 
-   AZURE_OPENAI_ENDPOINT= Enter the URL/Endpoint/Base of Azure OpenAI
-   ```
+# 3. Ensure PostgreSQL and Redis are running
+docker compose up -d db redis
 
-   Replace the placeholders with the respective values from your Azure account.
+# 4. Start ASGI server with live reload
+uvicorn backend.api:app --host 0.0.0.0 --port 8000 --reload
+```
 
-### 3. Install Dependencies
+- Swagger UI Documentation: [http://localhost:8000/docs](http://localhost:8000/docs)
+- Health Check: [http://localhost:8000/health](http://localhost:8000/health)
 
-Install the required Python libraries using `pip`:
+### Method 2: Docker Compose Full Stack
+```bash
+docker compose up -d api
+```
+
+---
+
+## 🗄️ Database Migrations (Alembic)
 
 ```bash
-$ pip install -r requirements.txt
+# Generate versioned migration script after modifying models.py
+alembic revision --autogenerate -m "Add description of changes"
+
+# Apply migrations
+alembic upgrade head
+
+# Rollback last migration
+alembic downgrade -1
 ```
 
-Ensure all dependencies are successfully installed before proceeding.
-
 ---
 
-## Customizing the Prompt
+## 🛡️ Administrative CLI
 
-The prompt used in the chat application can be modified to suit your specific use case. To customize the prompt:
-
-1. Open the `chat.py` file located in the project directory.
-2. Locate the section of the code where the prompt is defined.
-3. Modify the prompt as needed. For example:
-
-   ```python
-   prompt = "Hello! How can I assist you today?"
-   ```
-
-   Save the changes once you have updated the prompt.
-
----
-
-## Running the Application
-
-Start the application by executing the `chat.py` script:
+Use `backend/cli.py` to manage system users and elevate administrators:
 
 ```bash
-$ python chat.py
+# List all registered users
+python -m backend.cli list-users
+
+# Promote user to administrator
+python -m backend.cli promote-admin user@example.com
+
+# Demote administrator
+python -m backend.cli demote-admin user@example.com
+
+# Reset user password
+python -m backend.cli set-password user@example.com NewSecurePassword123!
 ```
 
-The chat interface will be displayed, and you can interact with the application.
-
 ---
 
-## Features
+## 🧪 Verification & Diagnostics
 
-- Real-time streaming responses powered by Azure OpenAI.
-- Customizable prompt to adapt to various conversational needs.
-- Easy setup and configuration.
+Run the full diagnostic suite to verify TCP connectivity, public endpoints, auth, and live LLM streaming:
 
----
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Missing Azure Credentials**:
-   Ensure the `.env` file is correctly configured with valid Azure credentials.
-
-2. **Dependency Installation Errors**:
-   Verify that you are using the correct Python version and that `pip` is updated. Run:
-   
-   ```bash
-   $ pip install --upgrade pip
-   ```
-
-3. **Connection Issues**:
-   Check your internet connection and ensure that the Azure endpoint is accessible.
-
-### Logs
-
-Enable debugging logs in the `chat.py` file for additional insights by modifying the logging level as needed.
-
----
-
-## Contributing
-
-Contributions are welcome! Feel free to submit issues or pull requests to enhance the functionality of Qiwipi.
-
----
-
-## License
-
-This project is licensed under the [MIT License](LICENSE).
-
----
-
-## Acknowledgments
-
-Special thanks to the Azure OpenAI team for providing the tools and resources to make this application possible.
-
----
-
-## Additional Information
-
-### `.env` File Example
-
-The `.env` file should include the following content:
-
-```plaintext
-AZURE_OPENAI_API_KEY= Enter Azure OpenAI API Key
-AZURE_OPENAI_DEPLOYMENT= Enter Model Name as Deployed on Azure
-AZURE_OPENAI_VERSION= Enter the Azure OpenAI API Version 
-AZURE_OPENAI_ENDPOINT= Enter the URL/Endpoint/Base of Azure OpenAI
-```
-
-### `chat.py` File Example
-
-The `chat.py` file utilizes the Pydantic library to handle environment variables and OpenAI's SDK for interacting with the Azure OpenAI API. Below is a summary of its content:
-
-```python
-from pydantic import BaseModel
-from typing import Optional
-import asyncio
-import openai
-from dotenv import load_dotenv
-import os
-
-load_dotenv(override=True)
-
-class AzureOpenAI(BaseModel):
-    API_KEY: Optional[str] = os.getenv("AZURE_OPENAI_API_KEY")
-    MODEL_NAME: Optional[str] = os.getenv("AZURE_OPENAI_DEPLOYMENT")
-    AZURE_ENDPOINT: Optional[str] = os.getenv("AZURE_OPENAI_ENDPOINT")
-    API_VERSION: Optional[str] = os.getenv("AZURE_OPENAI_VERSION")
-
-    async def llm(self):
-        client = openai.AsyncAzureOpenAI(
-            api_key=self.API_KEY,
-            api_version=self.API_VERSION,
-            azure_endpoint=self.AZURE_ENDPOINT
-        )
-        return client
-
-    async def client(self, prompt):
-        client = await self.llm()
-        print(client)
-
-        completion = await client.chat.completions.create(
-            model=self.MODEL_NAME,
-            temperature=0,
-            max_tokens=500,
-            n=1,
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant!."},
-                {"role": "user", "content": f"{prompt}"},
-            ],
-            stream=True,
-        )
-        
-        print("Response: ")
-        async for event in completion:
-            if event.choices:
-                content = event.choices[0].delta.content
-                if content:
-                    print(content, end="", flush=True)
-
-if __name__ == "__main__":
-    prompt = "Write an essay on the Universe and it's existence"
-    azure = AzureOpenAI()
-    asyncio.run(azure.client(prompt))
+```bash
+python backend/verify_servers.py
 ```
